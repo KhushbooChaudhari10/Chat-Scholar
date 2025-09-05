@@ -1,0 +1,105 @@
+<!-- /your_project_folder/templates/chat.html -->
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Chat with your PDF</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background-color: #f4f4f9; display: flex; flex-direction: column; height: 100vh; }
+        .container { max-width: 800px; margin: auto; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; width: 100%; border-radius: 8px; }
+        h1 { color: #333; text-align: center; padding: 20px; margin: 0; border-bottom: 1px solid #eee; }
+        .chat-window { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        .message { max-width: 70%; padding: 10px 15px; margin-bottom: 10px; border-radius: 18px; line-height: 1.4; }
+        .user-message { background-color: #007bff; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .bot-message { background-color: #e9ecef; color: #495057; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .bot-message.thinking { color: #6c757d; font-style: italic; }
+        .chat-form { display: flex; padding: 20px; border-top: 1px solid #eee; }
+        #query-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; margin-right: 10px; }
+        #submit-btn { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 20px; cursor: pointer; }
+        #submit-btn:hover { background-color: #0056b3; }
+        #submit-btn:disabled { background-color: #a0a0a0; cursor: not-allowed; }
+        .home-link { text-align: center; padding: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chat with your Document</h1>
+        <div class="chat-window" id="chat-window">
+            <!-- Chat messages will be appended here -->
+            {% for message in session.get('chat_history', []) %}
+                <div class="message {{ 'user-message' if message.role == 'user' else 'bot-message' }}">
+                    {{ message.content }}
+                </div>
+            {% endfor %}
+        </div>
+        <form class="chat-form" id="chat-form">
+            <input type="text" id="query-input" placeholder="Ask a question..." autocomplete="off">
+            <button type="submit" id="submit-btn">Send</button>
+        </form>
+    </div>
+    <div class="home-link">
+        <a href="{{ url_for('show_upload_form') }}">Back to Upload</a>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatWindow = document.getElementById('chat-window');
+        const chatForm = document.getElementById('chat-form');
+        const queryInput = document.getElementById('query-input');
+        const submitBtn = document.getElementById('submit-btn');
+
+        // Scroll to the bottom of the chat window on load
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+
+        chatForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            // Disable form and display user message
+            queryInput.value = '';
+            submitBtn.disabled = true;
+            addMessage(query, 'user-message');
+
+            // Add a "thinking" message from the bot
+            const thinkingMessage = addMessage('Thinking...', 'bot-message thinking');
+
+            try {
+                const response = await fetch("{{ url_for('ask') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                // Update the "thinking" message with the actual answer
+                thinkingMessage.textContent = data.answer;
+                thinkingMessage.classList.remove('thinking');
+
+            } catch (error) {
+                console.error('Error:', error);
+                thinkingMessage.textContent = 'Sorry, something went wrong. Please try again.';
+                thinkingMessage.classList.remove('thinking');
+            } finally {
+                submitBtn.disabled = false;
+                queryInput.focus();
+            }
+        });
+
+        function addMessage(content, className) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${className}`;
+            messageDiv.textContent = content;
+            chatWindow.appendChild(messageDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            return messageDiv;
+        }
+    });
+</script>
+</body>
+</html>

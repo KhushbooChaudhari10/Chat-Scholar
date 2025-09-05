@@ -1,0 +1,9 @@
+# /your_project_folder/requirements.txt
+Flask
+Werkzeug
+langchain
+langchain-community
+pypdf
+chromadb
+sentence-transformers
+langchain-ollama
