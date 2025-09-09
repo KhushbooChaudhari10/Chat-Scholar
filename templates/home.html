@@ -1,0 +1,23 @@
+<!-- /your_project_folder/templates/home.html -->
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>PDF Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f9; }
+        .container { text-align: center; }
+        .btn { background-color: #007bff; color: white; padding: 20px 40px; text-decoration: none; border-radius: 8px; font-size: 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: background-color 0.3s; }
+        .btn:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="btn-container">
+            <a href="{{ url_for('show_upload_form') }}" class="btn">PDF Chatbot</a>
+            <a href="{{ url_for('essay_grading') }}" class="btn">Essay Grading System</a>
+        </div>
+    </div>
+</body>
+</html>

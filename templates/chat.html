@@ -39,7 +39,7 @@
         </form>
     </div>
     <div class="home-link">
-        <a href="{{ url_for('show_upload_form') }}">Back to Upload</a>
+        <a href="{{ url_for('home') }}">Back to Home</a>
     </div>
 
 <script>
@@ -77,14 +77,15 @@
                 }
 
                 const data = await response.json();
-                // Update the "thinking" message with the actual answer
-                thinkingMessage.textContent = data.answer;
+                // Update the "thinking" message with the actual answer or an error
+                thinkingMessage.textContent = data.answer || data.error || 'Sorry, an unknown error occurred.';
                 thinkingMessage.classList.remove('thinking');
 
             } catch (error) {
                 console.error('Error:', error);
                 thinkingMessage.textContent = 'Sorry, something went wrong. Please try again.';
                 thinkingMessage.classList.remove('thinking');
+                thinkingMessage.classList.add('error'); // Optional: style the error message
             } finally {
                 submitBtn.disabled = false;
                 queryInput.focus();

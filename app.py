@@ -9,15 +9,18 @@ from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.llms import Ollama
 from langchain.chains import RetrievalQA
+from openai import OpenAI
 
 # Define the folder to store uploaded PDF files
 UPLOAD_FOLDER = 'uploads'
+ESSAY_UPLOAD_FOLDER = 'essay_uploads'
 CHROMA_DB_FOLDER = 'chroma_db'
 # Define the allowed file extensions
 ALLOWED_EXTENSIONS = {'pdf'}
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['ESSAY_UPLOAD_FOLDER'] = ESSAY_UPLOAD_FOLDER
 app.config['CHROMA_DB_FOLDER'] = CHROMA_DB_FOLDER
 # It's a good practice to set a secret key for session management (e.g., for flashing messages)
 app.secret_key = os.urandom(24)
@@ -28,16 +31,21 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 @app.route('/', methods=['GET'])
+def home():
+    """Renders the main homepage."""
+    return render_template('home.html')
+
+@app.route('/upload-page', methods=['GET'])
 def show_upload_form():
+    """Renders the file upload page."""
     return render_template('index.html')
 
 # Route for handling the file upload (POST)
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
-        flash('No file part in the request.')
+        flash('No file part in the request.')    
         return redirect(url_for('show_upload_form'))
-    
     file = request.files['file']
 
     if file.filename == '':
@@ -71,11 +79,11 @@ def upload_file():
             )
 
             flash(f'File "{filename}" uploaded and embedded successfully!')
+            return redirect(url_for('chat'))
         except Exception as e:
             print(f"Error processing PDF and creating embeddings: {e}")
-            flash(f'File "{filename}" was uploaded, but processing failed. Error: {e}')
-
-        return redirect(url_for('show_upload_form'))
+            flash(f'File "{filename}" was uploaded, but processing failed. Error: {e}')            
+            return redirect(url_for('show_upload_form'))
     else:
         flash('Invalid file type. Only PDF files are allowed.')
         return redirect(url_for('show_upload_form'))
@@ -93,7 +101,7 @@ def chat():
         session['chat_history'] = [
             {'role': 'bot', 'content': 'Hello! How can I help you with your document today?'}
         ]
-    return render_template('chat.html')
+    return render_template('chat.html', chat_history=session['chat_history'])
 
 @app.route('/ask', methods=['POST'])
 def ask():
@@ -139,6 +147,83 @@ def ask():
     except Exception as e:
         print(f"Error during question answering: {e}")
         return jsonify({"error": "An error occurred while processing your question."}), 500
+
+@app.route('/essay-grading')
+def essay_grading():
+    """Renders the essay grading page."""
+    return render_template('essay_grading.html')
+
+@app.route('/grade-essay', methods=['POST'])
+def grade_essay():
+    """Handles the essay grading based on rubrics."""
+    rubrics = request.form.get('rubrics')
+    # Store rubrics in session or handle them as needed
+    session['rubrics'] = rubrics
+    # For now, let's redirect to a new page to upload the essay
+    return redirect(url_for('upload_essay_page'))
+
+@app.route('/upload-essay')
+def upload_essay_page():
+    """Renders the page to upload an essay."""
+    return render_template('upload_essay.html')
+
+@app.route('/upload-essay-file', methods=['POST'])
+def upload_essay_file():
+    if 'file' not in request.files:
+        flash('No file part in the request.')
+        return redirect(url_for('upload_essay_page'))
+    file = request.files['file']
+
+    if file.filename == '':
+        flash('No file selected.')
+        return redirect(url_for('upload_essay_page'))
+
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        os.makedirs(app.config['ESSAY_UPLOAD_FOLDER'], exist_ok=True)
+        file_path = os.path.join(app.config['ESSAY_UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+
+        try:
+            # --- LangChain processing ---
+            loader = PyPDFLoader(file_path)
+            documents = loader.load()
+            
+            # For essay, we usually take the whole content.
+            essay_content = "".join([doc.page_content for doc in documents])
+            
+            rubrics = session.get('rubrics', 'No rubrics provided.')
+
+            # Here you would call the LLM to grade the essay.
+            # For now, we'll just display the content and rubrics.
+            
+            # This is a placeholder for the grading result.
+            client = OpenAI(
+                base_url="https://router.huggingface.co/v1",
+                api_key=os.environ["HF_TOKEN"],
+            )
+
+            completion = client.chat.completions.create(
+                model="openai/gpt-oss-120b:cerebras",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Please grade the following essay based on these rubrics:\nRubrics: {rubrics}\n\nEssay:\n{essay_content}"
+                    }
+                ],
+            )
+
+            grading_result = completion.choices[0].message.content
+
+            return render_template('grading_result.html', grading_result=grading_result)
+        except Exception as e:
+            print(f"Error processing PDF for grading: {e}")
+            flash(f'File "{filename}" was uploaded, but processing failed. Error: {e}')
+            return redirect(url_for('upload_essay_page'))
+    else:
+        flash('Invalid file type. Only PDF files are allowed.')
+        return redirect(url_for('upload_essay_page'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)
